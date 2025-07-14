@@ -1,5 +1,4 @@
 
-/// <reference types="react" />
 import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AskSupplyBot from '../components/AskSupplyBot';
@@ -49,12 +48,12 @@ const Index = () => {
       if (provider) {
         setHasMetamask(true);
         // Check if already connected
-        const accounts = await (provider as Eip1193Provider).request({ method: 'eth_accounts' });
+        const accounts = await (provider as unknown as Eip1193Provider).request({ method: 'eth_accounts' });
         if (accounts.length > 0) {
-          setWalletAddress(accounts[0]);
+          const address = accounts[0] as string;
+          setWalletAddress(address);
           const ethProvider = new BrowserProvider(window.ethereum as Eip1193Provider);
-          const signer: JsonRpcSigner = await ethProvider.getSigner();
-          const balance = await signer.getBalance();
+          const balance = await ethProvider.getBalance(address);
           setBalance(balance.toString());
         }
       } else {
@@ -64,19 +63,19 @@ const Index = () => {
     checkMetamask();
 
     if (window.ethereum) {
-      window.ethereum.on('accountsChanged', async (accounts: string[]) => {
+      (window.ethereum as Eip1193Provider).on('accountsChanged', async (accounts: string[]) => {
         if (accounts.length > 0) {
-          setWalletAddress(accounts[0]);
+          const address = accounts[0] as string;
+          setWalletAddress(address);
           const ethProvider = new BrowserProvider(window.ethereum as Eip1193Provider);
-          const signer: JsonRpcSigner = await ethProvider.getSigner();
-          const balance = await signer.getBalance();
+          const balance = await ethProvider.getBalance(address);
           setBalance(balance.toString());
         } else {
           setWalletAddress(null);
           setBalance(null);
         }
       });
-      window.ethereum.on('chainChanged', () => {
+      (window.ethereum as Eip1193Provider).on('chainChanged', () => {
         setWalletAddress(null);
         setBalance(null);
       });
@@ -90,12 +89,11 @@ const Index = () => {
         alert('Metamask is not installed. Please install it to connect your wallet.');
         return;
       }
-      const ethProvider = new BrowserProvider(provider as Eip1193Provider);
-      await ethProvider.send('eth_requestAccounts', []);
-      const signer: JsonRpcSigner = await ethProvider.getSigner();
-      const address = await signer.getAddress();
+      const ethProvider = new BrowserProvider(provider as unknown as Eip1193Provider);
+      const accounts = await ethProvider.send('eth_requestAccounts', []) as string[];
+      const address = accounts[0];
       setWalletAddress(address);
-      const balance = await signer.getBalance();
+      const balance = await ethProvider.getBalance(address);
       setBalance(balance.toString());
     } catch (error) {
       console.error('Failed to connect Metamask:', error);
@@ -112,15 +110,27 @@ const Index = () => {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50">
       <div className="absolute top-10 right-10 flex items-center space-x-4">
         <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setIsProfileModalOpen(true)}>
-          {user && user.photoURL ? (
-            <img src={user.photoURL} alt="Profile" className="w-8 h-8 rounded-full" />
+          {user && user.photoURL && user.photoURL !== '' ? (
+            <img
+              src={user.photoURL}
+              alt="Profile"
+              className="w-8 h-8 rounded-full"
+              onError={(e) => {
+                console.error('Error loading profile picture:', e.currentTarget.src);
+                e.currentTarget.src = '/placeholder.svg'; // Fallback to a generic image if loading fails
+              }}
+            />
           ) : (
             <User className="w-6 h-6 text-gray-600" />
           )}
           <span className="text-gray-800 font-medium">{user ? (user.displayName || user.email) : 'Profile'}</span>
         </div>
         <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setIsWalletModalOpen(true)}>
-          <Wallet className="w-6 h-6 text-gray-600" />
+          {walletAddress ? (
+            <img src="/metamask-connected.png" alt="Wallet Connected" className="w-6 h-6" /> // Replace with your connected icon
+          ) : (
+            <img src="/metamask-disconnected.jpeg" alt="Wallet Disconnected" className="w-6 h-6" /> // Replace with your disconnected icon
+          )}
           <span className="text-gray-800 font-medium">Wallet</span>
         </div>
       </div>

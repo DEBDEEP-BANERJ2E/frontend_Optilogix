@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import useGoogleMaps from '../hooks/useGoogleMaps';
 
 const LogisticsPage: React.FC = () => {
-  const apiKey = 'YOUR_GOOGLE_MAPS_API_KEY'; // Replace with your actual API key
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY; // Use environment variable
   const defaultMapOptions = {
     center: { lat: 34.052235, lng: -118.243683 }, // Default to Los Angeles
     zoom: 10,
