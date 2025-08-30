@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth } from '../firebase';
+import { auth } from '../lib/firebase';
 import TeamCollaboration from '../components/TeamCollaboration';
 import AskSupplyBot from '../components/AskSupplyBot';
 import Footer from '../components/Footer';

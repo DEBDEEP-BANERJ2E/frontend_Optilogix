@@ -20,26 +20,61 @@ const questions = [
 ];
 
 const QuestionsPage: React.FC = () => {
+  console.log('QuestionsPage component rendered');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ [key: number]: string }>({});
   const navigate = useNavigate();
+  
+  // Log when component mounts and check if we can access it
+  React.useEffect(() => {
+    console.log('QuestionsPage mounted');
+    console.log('Current question index:', currentQuestionIndex);
+    console.log('Available questions:', questions.length);
+    console.log('Current question:', questions[currentQuestionIndex]);
+    
+    // Force a re-render to ensure the component is properly displayed
+    const timer = setTimeout(() => {
+      console.log('Forcing re-render of QuestionsPage');
+      setCurrentQuestionIndex(currentQuestionIndex); // This forces a re-render without changing the value
+    }, 500);
+    
+    return () => {
+      console.log('QuestionsPage unmounted');
+      clearTimeout(timer);
+    };
+  }, []);
 
   const handleAnswerChange = (answer: string) => {
     setAnswers((prev) => ({ ...prev, [currentQuestionIndex]: answer }));
   };
 
   const handleNextQuestion = () => {
+    console.log('handleNextQuestion called, currentIndex:', currentQuestionIndex);
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
       // All questions answered, navigate to Index.tsx
-      navigate('/dashboard'); // Assuming Index.tsx is the dashboard route
+      console.log('All questions answered, navigating to dashboard');
+      try {
+        navigate('/dashboard');
+        console.log('Navigation to dashboard initiated');
+      } catch (error) {
+        console.error('Navigation error:', error);
+        window.location.href = '/dashboard';
+      }
     }
   };
 
   const handleSkip = () => {
     // All questions skipped or answered, navigate to Index.tsx
-    navigate('/dashboard');
+    console.log('Skip button clicked, navigating to dashboard');
+    try {
+      navigate('/dashboard');
+      console.log('Navigation to dashboard initiated from skip');
+    } catch (error) {
+      console.error('Navigation error in skip:', error);
+      window.location.href = '/dashboard';
+    }
   };
 
   return (

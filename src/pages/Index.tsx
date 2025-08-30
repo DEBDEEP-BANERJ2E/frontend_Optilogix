@@ -7,8 +7,8 @@ import RouteOptimizer from '@/components/RouteOptimizer';
 import SmartChain360Dashboard from '@/components/SmartChain360Dashboard';
 import Footer from '@/components/Footer';
 
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth } from '../firebase';
+import { onAuthStateChanged, User as FirebaseUser, signOut } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 import { useNavigate } from 'react-router-dom';
 import { Building, Route, Layout, User, Wallet, Package } from 'lucide-react';
 import SimpleModal from '../components/SimpleModal';
@@ -22,6 +22,7 @@ declare global {
   interface Window {
     ethereum?: Eip1193Provider & {
       isMetaMask?: boolean;
+      on: (event: string, callback: (...args: any[]) => void) => void;
     };
   }
 }
@@ -44,26 +45,35 @@ const Index = () => {
 
   useEffect(() => {
     const checkMetamask = async () => {
-      const provider = await detectEthereumProvider();
-      if (provider) {
-        setHasMetamask(true);
-        // Check if already connected
-        const accounts = await (provider as unknown as Eip1193Provider).request({ method: 'eth_accounts' });
-        if (accounts.length > 0) {
-          const address = accounts[0] as string;
-          setWalletAddress(address);
-          const ethProvider = new BrowserProvider(window.ethereum as Eip1193Provider);
-          const balance = await ethProvider.getBalance(address);
-          setBalance(balance.toString());
+      try {
+        const provider = await detectEthereumProvider({silent: true, mustBeMetaMask: false});
+        if (provider) {
+          setHasMetamask(true);
+          // Check if already connected
+          try {
+            const accounts = await (provider as unknown as Eip1193Provider).request({ method: 'eth_accounts' });
+            if (accounts.length > 0) {
+              const address = accounts[0] as string;
+              setWalletAddress(address);
+              const ethProvider = new BrowserProvider(window.ethereum as Eip1193Provider);
+              const balance = await ethProvider.getBalance(address);
+              setBalance(balance.toString());
+            }
+          } catch (error) {
+            console.error('Error checking MetaMask accounts:', error);
+          }
+        } else {
+          setHasMetamask(false);
         }
-      } else {
+      } catch (error) {
+        console.error('Error detecting Ethereum provider:', error);
         setHasMetamask(false);
       }
     };
     checkMetamask();
 
     if (window.ethereum) {
-      (window.ethereum as Eip1193Provider).on('accountsChanged', async (accounts: string[]) => {
+      (window.ethereum as any).on('accountsChanged', async (accounts: string[]) => {
         if (accounts.length > 0) {
           const address = accounts[0] as string;
           setWalletAddress(address);
@@ -75,7 +85,7 @@ const Index = () => {
           setBalance(null);
         }
       });
-      (window.ethereum as Eip1193Provider).on('chainChanged', () => {
+      (window.ethereum as any).on('chainChanged', () => {
         setWalletAddress(null);
         setBalance(null);
       });
@@ -84,20 +94,27 @@ const Index = () => {
 
   const connectWallet = async () => {
     try {
-      const provider = await detectEthereumProvider();
+      const provider = await detectEthereumProvider({silent: true, mustBeMetaMask: false});
       if (!provider) {
         alert('Metamask is not installed. Please install it to connect your wallet.');
         return;
       }
-      const ethProvider = new BrowserProvider(provider as unknown as Eip1193Provider);
-      const accounts = await ethProvider.send('eth_requestAccounts', []) as string[];
-      const address = accounts[0];
-      setWalletAddress(address);
-      const balance = await ethProvider.getBalance(address);
-      setBalance(balance.toString());
+      try {
+        const ethProvider = new BrowserProvider(provider as unknown as Eip1193Provider);
+        const accounts = await ethProvider.send('eth_requestAccounts', []) as string[];
+        if (accounts && accounts.length > 0) {
+          const address = accounts[0];
+          setWalletAddress(address);
+          const balance = await ethProvider.getBalance(address);
+          setBalance(balance.toString());
+        }
+      } catch (innerError) {
+        console.error('Failed to request accounts or get balance:', innerError);
+        alert('Failed to connect to your wallet. Please try again.');
+      }
     } catch (error) {
-      console.error('Failed to connect Metamask:', error);
-      alert('Failed to connect Metamask. Please try again.');
+      console.error('Failed to detect Ethereum provider:', error);
+      alert('Failed to detect Metamask. Please make sure it is installed and try again.');
     }
   };
 
@@ -119,6 +136,8 @@ const Index = () => {
                 console.error('Error loading profile picture:', e.currentTarget.src);
                 e.currentTarget.src = '/placeholder.svg'; // Fallback to a generic image if loading fails
               }}
+              referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
             />
           ) : (
             <User className="w-6 h-6 text-gray-600" />
@@ -207,11 +226,26 @@ const Index = () => {
       >
         {user ? (
           <div className="text-center">
-            {user.photoURL && <img src={user.photoURL} alt="Profile" className="w-24 h-24 rounded-full mx-auto mb-4" />}
+            {user.photoURL && <img src={user.photoURL} alt="Profile" className="w-24 h-24 rounded-full mx-auto mb-4" referrerPolicy="no-referrer" crossOrigin="anonymous" />}
             <p className="text-lg font-semibold">Name: {user.displayName || 'N/A'}</p>
             <p className="text-lg font-semibold">Email: {user.email || 'N/A'}</p>
             <p className="text-gray-600 mt-2">This is your user profile information.</p>
             <p className="text-gray-600">You can add more details here.</p>
+            <button
+              onClick={() => {
+                signOut(auth).then(() => {
+                  console.log('User signed out successfully');
+                  setIsProfileModalOpen(false);
+                  navigate('/auth');
+                }).catch((error) => {
+                  console.error('Error signing out:', error);
+                  alert('Failed to sign out. Please try again.');
+                });
+              }}
+              className="mt-4 px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+            >
+              Sign Out
+            </button>
           </div>
         ) : (
           <p>Please sign in to view your profile information.</p>
